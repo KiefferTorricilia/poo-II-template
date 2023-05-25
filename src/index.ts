@@ -1,9 +1,11 @@
 import express, { Request, Response } from 'express'
 import cors from 'cors'
 import { TAccountDB, TAccountDBPost, TUserDB, TUserDBPost } from './types'
-import { db } from './database/knex'
+import { db } from './database/BaseDatabase'
 import { User } from './models/User'
 import { Account } from './models/Account'
+import { userDatabase } from './database/UserDatabase'
+import { AccountsDatabase } from './database/AccountsDatabase'
 
 const app = express()
 
@@ -34,17 +36,11 @@ app.get("/ping", async (req: Request, res: Response) => {
 
 app.get("/users", async (req: Request, res: Response) => {
     try {
-        const q = req.query.q
+        const q = req.query.q as string
 
-        let usersDB
+       const user_Database = new userDatabase()
 
-        if (q) {
-            const result: TUserDB[] = await db("users").where("name", "LIKE", `%${q}%`)
-            usersDB = result
-        } else {
-            const result: TUserDB[] = await db("users")
-            usersDB = result
-        }
+       const usersDB:TUserDB[] = await user_Database.findUsers(q)
 
         const users: User[] = usersDB.map((userDB) => new User(
             userDB.id,
@@ -94,7 +90,8 @@ app.post("/users", async (req: Request, res: Response) => {
             throw new Error("'password' deve ser string")
         }
 
-        const [ userDBExists ]: TUserDB[] | undefined[] = await db("users").where({ id })
+        const user_Database = new userDatabase()
+        const userDBExists = await user_Database.findUserById(id)
 
         if (userDBExists) {
             res.status(400)
@@ -117,7 +114,7 @@ app.post("/users", async (req: Request, res: Response) => {
             created_at: newUser.getCreatedAt()
         }
 
-        await db("users").insert(newUserDB)
+        await user_Database.insertUser(newUserDB)
 
         res.status(201).send(newUser)
     } catch (error) {
@@ -137,7 +134,10 @@ app.post("/users", async (req: Request, res: Response) => {
 
 app.get("/accounts", async (req: Request, res: Response) => {
     try {
-        const accountsDB: TAccountDB[] = await db("accounts")
+        
+        const accounts_database = new AccountsDatabase()
+        
+        const accountsDB: TAccountDB[] = await accounts_database.findAccounts()
 
         const accounts = accountsDB.map((accountDB) => new Account(
             accountDB.id,
@@ -166,7 +166,11 @@ app.get("/accounts/:id/balance", async (req: Request, res: Response) => {
     try {
         const id = req.params.id
 
-        const [ accountDB ]: TAccountDB[] | undefined[] = await db("accounts").where({ id })
+        // const [ accountDB ]: TAccountDB[] | undefined[] = await db("accounts").where({ id })
+
+        const accounts_database = new AccountsDatabase()
+
+        const accountDB: TAccountDB = await accounts_database.findAccountsById(id)
 
         if (!accountDB) {
             res.status(404)
@@ -213,7 +217,9 @@ app.post("/accounts", async (req: Request, res: Response) => {
             throw new Error("'ownerId' deve ser string")
         }
 
-        const [ accountDBExists ]: TAccountDB[] | undefined[] = await db("accounts").where({ id })
+        const accounts_database = new AccountsDatabase;
+
+        const accountDBExists: TAccountDB = await accounts_database.createNewAccounts(id)
 
         if (accountDBExists) {
             res.status(400)
@@ -262,7 +268,11 @@ app.put("/accounts/:id/balance", async (req: Request, res: Response) => {
             throw new Error("'value' deve ser number")
         }
 
-        const [ accountDB ]: TAccountDB[] | undefined[] = await db("accounts").where({ id })
+        // const [ accountDB ]: TAccountDB[] | undefined[] = await db("accounts").where({ id })
+
+        const accounts_database = new AccountsDatabase
+
+        const accountDB: TAccountDB = await accounts_database.updateAccounts(id)
 
         if (!accountDB) {
             res.status(404)
